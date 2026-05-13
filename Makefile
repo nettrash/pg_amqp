@@ -17,7 +17,7 @@ OBJS         = src/pg_amqp.o \
 	src/librabbitmq/amqp_table.o
 
 # Link against OpenSSL for TLS/SSL support
-SHLIB_LINK   = -lssl -lcrypto
+SHLIB_LINK  += -lssl -lcrypto
 
 
 all: sql/$(EXTENSION)--$(EXTVERSION).sql

@@ -132,3 +132,8 @@ For mutual TLS, also set `ssl_cert` and `ssl_key`.
 
 Note: certificate/key paths must be readable by the PostgreSQL server process.
 
+Security: `ssl_cacert`, `ssl_cert`, and `ssl_key` are filesystem paths opened
+by the PostgreSQL backend. A role with INSERT/UPDATE on `amqp.broker` can
+therefore cause the server process to attempt to open arbitrary files
+readable by the postgres OS user. Restrict write privileges on
+`amqp.broker` accordingly (typically: superuser/owner only).

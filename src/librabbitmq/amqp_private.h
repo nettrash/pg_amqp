@@ -88,7 +88,11 @@ static inline int amqp_ssl_write(amqp_connection_state_t state,
 {
   if (state->ssl) {
     int rv = SSL_write(state->ssl, buf, (int)len);
-    return rv > 0 ? rv : -1;
+    if (rv > 0) return rv;
+    {
+      int err = SSL_get_error(state->ssl, rv);
+      return (err == SSL_ERROR_SYSCALL && errno != 0) ? -errno : -EIO;
+    }
   }
   {
     ssize_t rv = write(state->sockfd, buf, len);
@@ -104,7 +108,8 @@ static inline int amqp_ssl_read(amqp_connection_state_t state,
     int rv = SSL_read(state->ssl, buf, (int)len);
     if (rv > 0) return rv;
     err = SSL_get_error(state->ssl, rv);
-    return (err == SSL_ERROR_ZERO_RETURN) ? 0 : -EIO;
+    if (err == SSL_ERROR_ZERO_RETURN) return 0;
+    return (err == SSL_ERROR_SYSCALL && errno != 0) ? -errno : -EIO;
   }
   {
     ssize_t rv = read(state->sockfd, buf, len);

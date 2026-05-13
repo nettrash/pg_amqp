@@ -140,7 +140,7 @@ static void amqp_local_phase2(XactEvent event, void *arg) {
   }
 }
 
-void _PG_init() {
+void _PG_init(void) {
   RegisterXactCallback(amqp_local_phase2, NULL);
 }
 
