@@ -546,7 +546,9 @@ int amqp_ssl_handshake(amqp_connection_state_t state,
 
   /* Enable automatic hostname verification when verifying peer */
   if (verify_peer) {
+#ifdef X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS
     SSL_set_hostflags(ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+#endif
     if (!SSL_set1_host(ssl, hostname)) {
       SSL_free(ssl);
       return -1;

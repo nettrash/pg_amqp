@@ -98,7 +98,13 @@ static void amqp_local_phase2(XactEvent event, void *arg) {
   amqp_rpc_reply_t *reply;
   struct brokerstate *bs;
   switch(event) {
+    case XACT_EVENT_PRE_COMMIT:
+    case XACT_EVENT_PARALLEL_PRE_COMMIT:
+    case XACT_EVENT_PRE_PREPARE:
+      /* no-op */
+      break;
     case XACT_EVENT_COMMIT:
+    case XACT_EVENT_PARALLEL_COMMIT:
       for(bs = HEAD_BS; bs; bs = bs->next) {
         if(bs->inerror) local_amqp_disconnect_bs(bs);
         bs->inerror = 0;
@@ -113,6 +119,7 @@ static void amqp_local_phase2(XactEvent event, void *arg) {
       }
       break;
     case XACT_EVENT_ABORT:
+    case XACT_EVENT_PARALLEL_ABORT:
       for(bs = HEAD_BS; bs; bs = bs->next) {
         if(bs->inerror) local_amqp_disconnect_bs(bs);
         bs->inerror = 0;

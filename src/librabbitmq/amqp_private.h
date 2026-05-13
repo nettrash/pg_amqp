@@ -100,9 +100,10 @@ static inline int amqp_ssl_read(amqp_connection_state_t state,
                                  void *buf, size_t len)
 {
   if (state->ssl) {
+    int err;
     int rv = SSL_read(state->ssl, buf, (int)len);
     if (rv > 0) return rv;
-    int err = SSL_get_error(state->ssl, rv);
+    err = SSL_get_error(state->ssl, rv);
     return (err == SSL_ERROR_ZERO_RETURN) ? 0 : -EIO;
   }
   {
