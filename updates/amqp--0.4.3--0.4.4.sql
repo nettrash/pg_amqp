@@ -1,0 +1,2 @@
+-- No schema changes in 0.4.4.
+-- This release provides PostgreSQL 18 and OpenSSL compatibility fixes in C code.

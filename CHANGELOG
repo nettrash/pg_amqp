@@ -1,3 +1,8 @@
+0.4.4
+-- Fix OpenSSL compatibility for hostname verification by guarding use of X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS when it is not available in system headers.
+-- Fix declaration ordering in TLS read helper to satisfy strict -Wdeclaration-after-statement toolchains.
+-- Handle PostgreSQL 18 XactEvent callback enum values (PRE_COMMIT, PARALLEL_PRE_COMMIT, PRE_PREPARE, PARALLEL_COMMIT, PARALLEL_ABORT) to avoid switch warnings on newer server headers.
+
 0.4.3
 -- Fix K&R-style function declarations (local_amqp_get_a_bs, local_amqp_get_bs, local_amqp_disconnect) to use ANSI C prototypes. Required for PostgreSQL 16+ which enforces -Werror with strict C11/C17 compilation, and mandatory for PostgreSQL 18 compatibility.
 -- Replace deprecated gethostbyname() with getaddrinfo() in the bundled librabbitmq socket layer. This adds IPv6 support, ensures thread-safety, and improves compatibility with modern RabbitMQ deployments on dual-stack or IPv6 hosts.

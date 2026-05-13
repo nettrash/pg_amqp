@@ -9,7 +9,7 @@ All bug reports, feature requests and general questions can be directed to the I
 Compatibility
 -------------
 
-Version 0.4.3 includes compatibility fixes for PostgreSQL 18 toolchains and
+Version 0.4.4 includes compatibility fixes for PostgreSQL 18 toolchains and
 modern RabbitMQ deployments (including IPv6 resolution and TLS/SSL transport).
 
 The extension speaks AMQP 0-9-1 and is intended for RabbitMQ-compatible
