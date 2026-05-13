@@ -16,7 +16,6 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include <netinet/in.h>
 
 #include <assert.h>
 
@@ -24,52 +23,71 @@ int amqp_open_socket(char const *hostname,
 		     int portnumber, struct timeval *timeout)
 {
   int result = -1;
-  int sockfd;
+  int sockfd = -1;
   int flags;
-  struct sockaddr_in addr;
-  struct hostent *he;
+  char portstr[16];
+  struct addrinfo hints;
+  struct addrinfo *res = NULL;
+  struct addrinfo *ai;
 
-  he = gethostbyname(hostname);
-  if (he == NULL) {
+  snprintf(portstr, sizeof(portstr), "%d", portnumber);
+
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family   = AF_UNSPEC;   /* support IPv4 and IPv6 */
+  hints.ai_socktype = SOCK_STREAM;
+
+  result = getaddrinfo(hostname, portstr, &hints, &res);
+  if (result != 0) {
     return -ENOENT;
   }
 
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(portnumber);
-  addr.sin_addr.s_addr = * (uint32_t *) he->h_addr_list[0];
-
-  sockfd = socket(PF_INET, SOCK_STREAM, 0);
-  if(((flags = fcntl(sockfd, F_GETFL, 0)) == -1) ||
-     (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) == -1)) {
-    result = -errno;
-    close(sockfd);
-    return -1;
-  }
-
-  if (connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-    result = -errno;
-    if(errno == EINPROGRESS) {
-      int aerrno, prv;
-      socklen_t aerrno_len = sizeof(aerrno);
-      struct pollfd pfd;
-
-      pfd.fd = sockfd;
-      pfd.events = POLLOUT;
-      prv = poll(&pfd, 1, timeout?(timeout->tv_sec*1000 + timeout->tv_usec/1000):-1);
-      if(prv == 1) {
-        if(getsockopt(sockfd,SOL_SOCKET,SO_ERROR, &aerrno, &aerrno_len) == 0) {
-          if(aerrno == 0) goto good;
-        }
-        else
-          goto good;
-        result = -aerrno;
-      }
-      else result = -ETIMEDOUT;
+  for (ai = res; ai != NULL; ai = ai->ai_next) {
+    sockfd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+    if (sockfd < 0) {
+      result = -errno;
+      continue;
     }
-    close(sockfd);
-    return result;
+
+    if(((flags = fcntl(sockfd, F_GETFL, 0)) == -1) ||
+       (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) == -1)) {
+      result = -errno;
+      close(sockfd);
+      sockfd = -1;
+      continue;
+    }
+
+    if (connect(sockfd, ai->ai_addr, ai->ai_addrlen) < 0) {
+      result = -errno;
+      if(errno == EINPROGRESS) {
+        int aerrno, prv;
+        socklen_t aerrno_len = sizeof(aerrno);
+        struct pollfd pfd;
+
+        pfd.fd = sockfd;
+        pfd.events = POLLOUT;
+        prv = poll(&pfd, 1, timeout?(timeout->tv_sec*1000 + timeout->tv_usec/1000):-1);
+        if(prv == 1) {
+          if(getsockopt(sockfd,SOL_SOCKET,SO_ERROR, &aerrno, &aerrno_len) == 0) {
+            if(aerrno == 0) goto good;
+          }
+          else
+            goto good;
+          result = -aerrno;
+        }
+        else result = -ETIMEDOUT;
+      }
+      close(sockfd);
+      sockfd = -1;
+      continue;
+    }
+    goto good;
   }
+
+  freeaddrinfo(res);
+  return sockfd < 0 ? result : sockfd;
+
 good:
+  freeaddrinfo(res);
   if(((flags = fcntl(sockfd, F_GETFL, 0)) == -1) ||
      (fcntl(sockfd, F_SETFL, flags & ~O_NONBLOCK) == -1)) {
     result = -errno;
@@ -97,7 +115,7 @@ static char *header() {
 }
 
 int amqp_send_header(amqp_connection_state_t state) {
-  return write(state->sockfd, header(), 8);
+  return amqp_ssl_write(state, header(), 8);
 }
 
 int amqp_send_header_to(amqp_connection_state_t state,
@@ -176,14 +194,14 @@ static int wait_frame_inner(amqp_connection_state_t state,
       assert(result != 0);
     }	
 
-    result = read(state->sockfd,
+    result = amqp_ssl_read(state,
 		  state->sock_inbound_buffer.bytes,
 		  state->sock_inbound_buffer.len);
     if (result < 0) {
-      return -errno;
+      return result;
     }
     if (result == 0) {
-      /* EOF. */
+      /* EOF / TLS close_notify */
       return 0;
     }
 
@@ -461,4 +479,96 @@ amqp_rpc_reply_t amqp_login(amqp_connection_state_t state,
   result.reply.decoded = NULL;
   result.library_errno = 0;
   return result;
+}
+
+/*
+ * Perform a TLS/SSL handshake on an already-connected TCP socket.
+ *
+ * hostname     - server hostname (used for SNI and peer certificate CN check)
+ * verify_peer  - non-zero to verify the server certificate chain
+ * cacert       - path to PEM CA certificate file (or NULL for system defaults)
+ * client_cert  - path to PEM client certificate file (or NULL)
+ * client_key   - path to PEM client private key file (or NULL)
+ *
+ * Returns 0 on success, -1 on failure.
+ */
+int amqp_ssl_handshake(amqp_connection_state_t state,
+                       const char *hostname,
+                       int verify_peer,
+                       const char *cacert,
+                       const char *client_cert,
+                       const char *client_key)
+{
+  SSL_CTX *ctx;
+  SSL     *ssl;
+
+  ctx = SSL_CTX_new(TLS_client_method());
+  if (!ctx)
+    return -1;
+
+  /* Require TLSv1.2 or newer */
+  SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+
+  /* Server certificate verification */
+  if (verify_peer) {
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    if (cacert) {
+      if (!SSL_CTX_load_verify_locations(ctx, cacert, NULL)) {
+        SSL_CTX_free(ctx);
+        return -1;
+      }
+    } else {
+      SSL_CTX_set_default_verify_paths(ctx);
+    }
+  } else {
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
+  }
+
+  /* Optional mutual TLS (client certificate) */
+  if (client_cert && client_key) {
+    if (!SSL_CTX_use_certificate_file(ctx, client_cert, SSL_FILETYPE_PEM) ||
+        !SSL_CTX_use_PrivateKey_file(ctx, client_key, SSL_FILETYPE_PEM)  ||
+        !SSL_CTX_check_private_key(ctx)) {
+      SSL_CTX_free(ctx);
+      return -1;
+    }
+  }
+
+  ssl = SSL_new(ctx);
+  SSL_CTX_free(ctx); /* ssl holds its own reference to the ctx internals */
+  if (!ssl)
+    return -1;
+
+  SSL_set_fd(ssl, state->sockfd);
+
+  /* SNI: send the hostname in the ClientHello */
+  SSL_set_tlsext_host_name(ssl, hostname);
+
+  /* Enable automatic hostname verification when verifying peer */
+  if (verify_peer) {
+    SSL_set_hostflags(ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+    if (!SSL_set1_host(ssl, hostname)) {
+      SSL_free(ssl);
+      return -1;
+    }
+  }
+
+  if (SSL_connect(ssl) != 1) {
+    SSL_free(ssl);
+    return -1;
+  }
+
+  state->ssl = ssl;
+  return 0;
+}
+
+/*
+ * Send a TLS close_notify alert.  Call this before closing the TCP socket
+ * so that the peer knows the connection was cleanly shut down.
+ */
+void amqp_ssl_shutdown(amqp_connection_state_t state)
+{
+  if (state && state->ssl) {
+    SSL_shutdown(state->ssl);
+  }
 }

@@ -6,6 +6,15 @@ publish messages to an [AMQP](http://www.amqp.org/) broker.
 
 All bug reports, feature requests and general questions can be directed to the Issues section on Github. - http://github.com/omniti-labs/pg_amqp
 
+Compatibility
+-------------
+
+Version 0.4.3 includes compatibility fixes for PostgreSQL 18 toolchains and
+modern RabbitMQ deployments (including IPv6 resolution and TLS/SSL transport).
+
+The extension speaks AMQP 0-9-1 and is intended for RabbitMQ-compatible
+brokers.
+
 
 Building
 --------
@@ -14,6 +23,9 @@ To build pg_amqp, just do this:
 
     make
     make install
+
+TLS/SSL support (added in 0.4.3) requires OpenSSL development libraries and
+linker support (`-lssl -lcrypto`).
 
 If you encounter an error such as:
 
@@ -94,4 +106,29 @@ If there is a need to disconnect from a specific broker, one can call:
 
 which will disconnect from the broker if it is connected and do nothing
 if it is already disconnected.
+
+TLS/SSL Broker Configuration
+----------------------------
+
+The `amqp.broker` table supports optional TLS/SSL settings:
+
+- `ssl` (boolean, default `false`): enable TLS for this broker connection
+- `ssl_verify` (boolean, default `true`): verify the server certificate
+- `ssl_cacert` (text): path to a PEM CA bundle for trust validation
+- `ssl_cert` (text): path to PEM client certificate for mutual TLS
+- `ssl_key` (text): path to PEM client private key for mutual TLS
+
+Example (server verification enabled):
+
+        INSERT INTO amqp.broker (
+            host, port, username, password,
+            vhost, ssl, ssl_verify, ssl_cacert
+        ) VALUES (
+            'rabbitmq.example.internal', 5671, 'app_user', 'secret',
+            '/', true, true, '/etc/ssl/certs/ca-bundle.pem'
+        );
+
+For mutual TLS, also set `ssl_cert` and `ssl_key`.
+
+Note: certificate/key paths must be readable by the PostgreSQL server process.
 

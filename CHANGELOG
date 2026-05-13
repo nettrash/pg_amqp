@@ -1,3 +1,9 @@
+0.4.3
+-- Fix K&R-style function declarations (local_amqp_get_a_bs, local_amqp_get_bs, local_amqp_disconnect) to use ANSI C prototypes. Required for PostgreSQL 16+ which enforces -Werror with strict C11/C17 compilation, and mandatory for PostgreSQL 18 compatibility.
+-- Replace deprecated gethostbyname() with getaddrinfo() in the bundled librabbitmq socket layer. This adds IPv6 support, ensures thread-safety, and improves compatibility with modern RabbitMQ deployments on dual-stack or IPv6 hosts.
+-- Add TLS/SSL support via OpenSSL. New amqp.broker columns (ssl, ssl_verify, ssl_cacert, ssl_cert, ssl_key) control the TLS configuration per broker. Supports server certificate verification, custom CA bundles, and mutual TLS (client certificates). Requires TLSv1.2 or newer. Makefile now links against -lssl -lcrypto.
+-- Rename confusingly-named PG91 Makefile variable to PG_GE91 for clarity.
+
 0.4.2
 --  Sets the maximum channels for a connection to that of the server which has been changed from 0 to 2047 in recent version of rabbitmq
 0.4.1

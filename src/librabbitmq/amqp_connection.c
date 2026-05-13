@@ -112,6 +112,10 @@ int amqp_get_channel_max(amqp_connection_state_t state) {
 }
 
 void amqp_destroy_connection(amqp_connection_state_t state) {
+  if (state->ssl) {
+    SSL_free(state->ssl);
+    state->ssl = NULL;
+  }
   empty_amqp_pool(&state->frame_pool);
   empty_amqp_pool(&state->decoding_pool);
   free(state->outbound_buffer.bytes);
@@ -381,18 +385,18 @@ int amqp_send_frame(amqp_connection_state_t state,
   separate_body = inner_send_frame(state, frame, &encoded, &payload_len);
   switch (separate_body) {
     case 0:
-      AMQP_CHECK_RESULT(write(state->sockfd,
+      AMQP_CHECK_RESULT(amqp_ssl_write(state,
 			      state->outbound_buffer.bytes,
 			      payload_len + (HEADER_SIZE + FOOTER_SIZE)));
       return 0;
 
     case 1:
-      AMQP_CHECK_RESULT(write(state->sockfd, state->outbound_buffer.bytes, HEADER_SIZE));
-      AMQP_CHECK_RESULT(write(state->sockfd, encoded.bytes, payload_len));
+      AMQP_CHECK_RESULT(amqp_ssl_write(state, state->outbound_buffer.bytes, HEADER_SIZE));
+      AMQP_CHECK_RESULT(amqp_ssl_write(state, encoded.bytes, payload_len));
       {
 	unsigned char frame_end_byte = AMQP_FRAME_END;
 	assert(FOOTER_SIZE == 1);
-	AMQP_CHECK_RESULT(write(state->sockfd, &frame_end_byte, FOOTER_SIZE));
+	AMQP_CHECK_RESULT(amqp_ssl_write(state, &frame_end_byte, FOOTER_SIZE));
       }
       return 0;
 

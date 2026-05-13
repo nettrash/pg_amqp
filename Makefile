@@ -2,9 +2,10 @@ EXTENSION    = amqp
 EXTVERSION   = $(shell grep default_version $(EXTENSION).control | \
                sed -e "s/default_version[[:space:]]*=[[:space:]]*'\([^']*\)'/\1/")
 PG_CONFIG    = pg_config
-PG91         = $(shell $(PG_CONFIG) --version | grep -qE " 8\.| 9\.0" && echo no || echo yes)
+# Require PostgreSQL 9.1+ (extension system). Rejects 8.x and 9.0.
+PG_GE91      = $(shell $(PG_CONFIG) --version | grep -qE " 8\.| 9\.0" && echo no || echo yes)
 
-ifeq ($(PG91),yes)
+ifeq ($(PG_GE91),yes)
 DOCS         = $(wildcard doc/*.*)
 #TESTS        = $(wildcard test/sql/*.sql)
 #REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
@@ -14,6 +15,9 @@ OBJS         = src/pg_amqp.o \
 	src/librabbitmq/amqp_api.o src/librabbitmq/amqp_connection.o src/librabbitmq/amqp_debug.o \
 	src/librabbitmq/amqp_framing.o src/librabbitmq/amqp_mem.o src/librabbitmq/amqp_socket.o \
 	src/librabbitmq/amqp_table.o
+
+# Link against OpenSSL for TLS/SSL support
+SHLIB_LINK   = -lssl -lcrypto
 
 
 all: sql/$(EXTENSION)--$(EXTVERSION).sql

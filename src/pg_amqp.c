@@ -87,6 +87,7 @@ local_amqp_disconnect_bs(struct brokerstate *bs) {
   if(bs && bs->conn) {
     int errorstate = bs->inerror;
     amqp_connection_close(bs->conn, AMQP_REPLY_SUCCESS);
+    amqp_ssl_shutdown(bs->conn);
     if(bs->sockfd >= 0) close(bs->sockfd);
     amqp_destroy_connection(bs->conn);
     memset(bs, 0, sizeof(*bs));
@@ -137,7 +138,7 @@ void _PG_init() {
 }
 
 static struct brokerstate *
-local_amqp_get_a_bs(broker_id) {
+local_amqp_get_a_bs(int broker_id) {
   struct brokerstate *bs;
   for(bs = HEAD_BS; bs; bs = bs->next) {
     if(bs->broker_id == broker_id) return bs;
@@ -149,14 +150,15 @@ local_amqp_get_a_bs(broker_id) {
   return bs;
 }
 static struct brokerstate *
-local_amqp_get_bs(broker_id) {
+local_amqp_get_bs(int broker_id) {
   char sql[1024];
   char host_copy[300] = "";
   int tries = 0;
   struct brokerstate *bs = local_amqp_get_a_bs(broker_id);
   if(bs->conn) return bs;
   if(SPI_connect() == SPI_ERROR_CONNECT) return NULL;
-  snprintf(sql, sizeof(sql), "SELECT host, port, vhost, username, password "
+  snprintf(sql, sizeof(sql), "SELECT host, port, vhost, username, password,"
+                             "       ssl, ssl_verify, ssl_cacert, ssl_cert, ssl_key"
                              "  FROM amqp.broker "
                              " WHERE broker_id = %d "
                              " ORDER BY host DESC, port", broker_id);
@@ -193,6 +195,35 @@ local_amqp_get_bs(broker_id) {
         goto busted;
       }
       amqp_set_sockfd(bs->conn, bs->sockfd);
+      /* SSL/TLS handshake (when ssl column is true) */
+      {
+        Datum ssl_datum;
+        bool  use_ssl = false;
+        ssl_datum = SPI_getbinval(SPI_tuptable->vals[bs->idx],
+                                  SPI_tuptable->tupdesc, 6, &is_null);
+        if (!is_null) use_ssl = DatumGetBool(ssl_datum);
+        if (use_ssl) {
+          int   ssl_verify   = 1;
+          char *ssl_cacert   = NULL;
+          char *ssl_cert     = NULL;
+          char *ssl_key      = NULL;
+          Datum verify_datum = SPI_getbinval(SPI_tuptable->vals[bs->idx],
+                                             SPI_tuptable->tupdesc, 7, &is_null);
+          if (!is_null) ssl_verify = DatumGetBool(verify_datum) ? 1 : 0;
+          ssl_cacert = SPI_getvalue(SPI_tuptable->vals[bs->idx],
+                                    SPI_tuptable->tupdesc, 8);
+          ssl_cert   = SPI_getvalue(SPI_tuptable->vals[bs->idx],
+                                    SPI_tuptable->tupdesc, 9);
+          ssl_key    = SPI_getvalue(SPI_tuptable->vals[bs->idx],
+                                    SPI_tuptable->tupdesc, 10);
+          if (amqp_ssl_handshake(bs->conn, host, ssl_verify,
+                                 ssl_cacert, ssl_cert, ssl_key) < 0) {
+            elog(WARNING, "amqp[%s] SSL/TLS handshake failed on broker %d",
+                 host_copy, broker_id);
+            goto busted;
+          }
+        }
+      }
       s_reply = amqp_login(bs->conn, vhost, 0, 131072,
                            0, AMQP_SASL_METHOD_PLAIN,
                            user, pass);
@@ -236,7 +267,7 @@ local_amqp_get_bs(broker_id) {
   return bs;
 }
 static void
-local_amqp_disconnect(broker_id) {
+local_amqp_disconnect(int broker_id) {
   struct brokerstate *bs = local_amqp_get_a_bs(broker_id);
   local_amqp_disconnect_bs(bs);
 }

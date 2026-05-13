@@ -343,6 +343,27 @@ extern amqp_boolean_t amqp_data_in_buffer(amqp_connection_state_t state);
  */
 extern amqp_rpc_reply_t *amqp_get_rpc_reply(void);
 
+/*
+ * TLS/SSL support.
+ *
+ * amqp_ssl_handshake() upgrades an existing TCP connection to TLS.
+ *   hostname    - server hostname for SNI and (when verify_peer!=0) certificate check
+ *   verify_peer - non-zero to verify the server's certificate chain
+ *   cacert      - path to a PEM CA bundle, or NULL to use system defaults
+ *   client_cert - path to a PEM client certificate, or NULL
+ *   client_key  - path to the matching PEM private key, or NULL
+ * Returns 0 on success, -1 on failure.
+ *
+ * amqp_ssl_shutdown() sends a TLS close_notify before the TCP socket is closed.
+ */
+extern int  amqp_ssl_handshake(amqp_connection_state_t state,
+                               const char *hostname,
+                               int         verify_peer,
+                               const char *cacert,
+                               const char *client_cert,
+                               const char *client_key);
+extern void amqp_ssl_shutdown(amqp_connection_state_t state);
+
 #ifdef __cplusplus
 }
 #endif
