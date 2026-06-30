@@ -1,0 +1,4 @@
+-- No schema changes in 0.4.5.
+-- This release provides connection-handling optimizations in C code:
+-- reconnect backoff, TCP keepalive/nodelay, a separate operational socket
+-- timeout, and caching of the amqp.broker configuration per connection.

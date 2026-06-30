@@ -11,13 +11,19 @@ DOCS         = $(wildcard doc/*.*)
 #REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
 #REGRESS_OPTS = --inputdir=test
 MODULE_big   = $(patsubst src/%.c,%,$(wildcard src/*.c))
-OBJS         = src/pg_amqp.o \
-	src/librabbitmq/amqp_api.o src/librabbitmq/amqp_connection.o src/librabbitmq/amqp_debug.o \
-	src/librabbitmq/amqp_framing.o src/librabbitmq/amqp_mem.o src/librabbitmq/amqp_socket.o \
-	src/librabbitmq/amqp_table.o
+OBJS         = src/pg_amqp.o
 
-# Link against OpenSSL for TLS/SSL support
-SHLIB_LINK  += -lssl -lcrypto
+# Link against the maintained rabbitmq-c client library (librabbitmq).
+# On Ubuntu/Debian (the primary target) install "librabbitmq-dev"; on macOS
+# "brew install rabbitmq-c".  TLS/SSL is handled inside librabbitmq, so we no
+# longer link OpenSSL directly.  Use pkg-config when available and fall back to
+# a plain -lrabbitmq otherwise.
+PKG_CONFIG     ?= pkg-config
+RABBITMQ_CFLAGS := $(shell $(PKG_CONFIG) --cflags librabbitmq 2>/dev/null)
+RABBITMQ_LIBS   := $(shell $(PKG_CONFIG) --libs librabbitmq 2>/dev/null || echo -lrabbitmq)
+
+PG_CPPFLAGS += $(RABBITMQ_CFLAGS)
+SHLIB_LINK  += $(RABBITMQ_LIBS)
 
 
 all: sql/$(EXTENSION)--$(EXTVERSION).sql

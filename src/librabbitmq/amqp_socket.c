@@ -15,6 +15,8 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <netdb.h>
 
 #include <assert.h>
@@ -88,6 +90,13 @@ int amqp_open_socket(char const *hostname,
 
 good:
   freeaddrinfo(res);
+  {
+    /* Detect dead peers (broker restart, idle NAT/firewall drop) and send small
+     * publish frames without Nagle delay. Failures here are non-fatal. */
+    int one = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one));
+    setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+  }
   if(((flags = fcntl(sockfd, F_GETFL, 0)) == -1) ||
      (fcntl(sockfd, F_SETFL, flags & ~O_NONBLOCK) == -1)) {
     result = -errno;

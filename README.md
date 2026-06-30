@@ -9,6 +9,11 @@ All bug reports, feature requests and general questions can be directed to the I
 Compatibility
 -------------
 
+Version 0.5.0 migrates the transport from the bundled librabbitmq fork to the
+maintained [rabbitmq-c](https://github.com/alanxz/rabbitmq-c) library (0.8 or
+newer; Ubuntu's `librabbitmq-dev` is supported). This brings native TLS, IPv6,
+and ongoing security maintenance. See Building for the new dependency.
+
 Version 0.4.4 includes compatibility fixes for PostgreSQL 18 toolchains and
 modern RabbitMQ deployments (including IPv6 resolution and TLS/SSL transport).
 
@@ -19,13 +24,30 @@ brokers.
 Building
 --------
 
+As of 0.5.0 pg_amqp links against the maintained
+[rabbitmq-c](https://github.com/alanxz/rabbitmq-c) client library instead of a
+bundled copy. Install its development package first:
+
+    # Ubuntu/Debian (primary target)
+    sudo apt-get install librabbitmq-dev
+
+    # RHEL/Rocky/Fedora
+    sudo dnf install librabbitmq-devel
+
+    # macOS (Homebrew)
+    brew install rabbitmq-c
+
+The build locates the library via `pkg-config librabbitmq` (falling back to a
+plain `-lrabbitmq`). TLS/SSL is handled inside rabbitmq-c, so pg_amqp no longer
+links OpenSSL directly. If `pkg-config` cannot find the library, point it at the
+install prefix, e.g.:
+
+    env PKG_CONFIG_PATH=/opt/homebrew/opt/rabbitmq-c/lib/pkgconfig make
+
 To build pg_amqp, just do this:
 
     make
     make install
-
-TLS/SSL support (added in 0.4.3) requires OpenSSL development libraries and
-linker support (`-lssl -lcrypto`).
 
 If you encounter an error such as:
 
@@ -136,4 +158,77 @@ Security: `ssl_cacert`, `ssl_cert`, and `ssl_key` are filesystem paths opened
 by the PostgreSQL backend. A role with INSERT/UPDATE on `amqp.broker` can
 therefore cause the server process to attempt to open arbitrary files
 readable by the postgres OS user. Restrict write privileges on
-`amqp.broker` accordingly (typically: superuser/owner only).
+`amqp.broker` accordingly (typically: superuser/owner only). When `ssl` is
+enabled with `ssl_verify = false` the server certificate is **not** validated
+(a WARNING is logged); avoid it outside trusted networks.
+
+Delivery semantics
+------------------
+
+Publishing is **synchronous and best-effort**, performed inside the calling
+PostgreSQL backend:
+
+- `amqp.publish()` buffers on a transactional AMQP channel and the messages are
+  flushed to the broker when the surrounding **PostgreSQL transaction commits**
+  (and discarded if it rolls back). The flush happens *after* PostgreSQL is
+  already durably committed, so a broker failure at that point cannot abort the
+  database transaction — it is reported as a `WARNING` (with the broker id and
+  the count of lost messages) and the messages are lost. A `true` return from
+  `publish()` means "buffered locally", **not** "delivered": there are no
+  publisher confirms. Always check the boolean return and treat `false` as a
+  reason to `ROLLBACK` if the message matters.
+- `amqp.autonomous_publish()` sends immediately and is unaffected by the
+  transaction outcome.
+- Messages published inside a savepoint or PL/pgSQL `EXCEPTION` block that later
+  rolls back are **not** delivered: to avoid emitting rolled-back work, the whole
+  transaction's buffered messages are discarded (with a `WARNING`) at commit.
+- `amqp.publish()` is rejected (`ERROR`) in a transaction that is then
+  `PREPARE`d (two-phase commit). Use `autonomous_publish()` or an outbox for 2PC.
+
+**If you cannot tolerate message loss, do not rely on inline publishing — use the
+built-in transactional outbox.** Enqueue inside your business transaction with
+`amqp.publish_outbox()` (a plain `INSERT` into `amqp.outbox`, atomic with your
+data and entirely off the broker's commit path), then ship to the broker out of
+band with `amqp.publish_outbox_batch()`:
+
+    -- in your application transaction (same signature as amqp.publish):
+    SELECT amqp.publish_outbox(broker_id, 'amq.direct', 'foo', 'message');
+
+    -- in a relay worker / pg_cron job, as its own transaction:
+    SELECT amqp.publish_outbox_batch();            -- all brokers, up to 100 rows
+    SELECT amqp.publish_outbox_batch(broker_id, 500);  -- one broker, larger batch
+
+`publish_outbox_batch()` claims rows with `FOR UPDATE SKIP LOCKED`, so you can run
+several relay workers concurrently. Delivery is **at-least-once** (the relay
+re-sends on retry and, absent publisher confirms, cannot detect a broker that
+accepts-then-drops a message), so make consumers idempotent. Undelivered rows are
+preserved across `pg_dump`/restore; published history and failures stay in
+`amqp.outbox` (`published_at`, `attempts`, `last_error`) for inspection — prune it
+yourself.
+
+Note also that there is one broker connection (two channels) per PostgreSQL
+backend with no pooling, so the broker connection count scales with your backend
+count.
+
+Tuning
+------
+
+The publish path will never block a backend longer than these (per broker host),
+all set via GUCs (`SET`, `postgresql.conf`, or `ALTER SYSTEM`):
+
+| GUC | Default | Controls |
+|-----|---------|----------|
+| `pg_amqp.connect_timeout_ms`   | `2000`  | TCP/TLS connect handshake |
+| `pg_amqp.handshake_timeout_ms` | `2000`  | AMQP login / channel.open / tx.select |
+| `pg_amqp.operation_timeout_ms` | `30000` | steady-state publish recv/send |
+| `pg_amqp.commit_timeout_ms`    | `2000`  | tx.commit / tx.rollback on the PostgreSQL commit/abort path |
+| `pg_amqp.connect_budget_ms`    | `0`     | total budget across all failover hosts in one connect attempt (`0` = unlimited) |
+| `pg_amqp.max_body_bytes`       | `0`     | reject bodies larger than this many bytes (`0` = no limit) |
+
+`commit_timeout_ms` is deliberately small because that operation runs inside
+PostgreSQL's commit while locks are held; lower it further if your broker SLA is
+tight. Under a degraded broker the failover/reconnect path also applies an
+exponential backoff (2s base, 30s cap) with per-backend jitter to avoid a
+cluster-wide reconnect storm. Prefer IP addresses over hostnames in
+`amqp.broker` — DNS resolution during connect is not covered by
+`connect_timeout_ms`.
