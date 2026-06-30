@@ -10,9 +10,10 @@ Compatibility
 -------------
 
 Version 0.5.0 migrates the transport from the bundled librabbitmq fork to the
-maintained [rabbitmq-c](https://github.com/alanxz/rabbitmq-c) library (0.8 or
-newer; Ubuntu's `librabbitmq-dev` is supported). This brings native TLS, IPv6,
-and ongoing security maintenance. See Building for the new dependency.
+maintained [rabbitmq-c](https://github.com/alanxz/rabbitmq-c) library (0.9 or
+newer; Ubuntu 20.04+/Debian 11+ `librabbitmq-dev` is supported, and the build is
+verified on Ubuntu 22.04 and 24.04). This brings native TLS, IPv6, and ongoing
+security maintenance. See Building for the new dependency.
 
 Version 0.4.4 includes compatibility fixes for PostgreSQL 18 toolchains and
 modern RabbitMQ deployments (including IPv6 resolution and TLS/SSL transport).
