@@ -1,0 +1,5 @@
+-- No schema changes in 0.4.2.
+-- C-only change: sets the maximum channels for a connection to that advertised
+-- by the server (changed from 0 to 2047 in recent RabbitMQ versions). A
+-- "make install" is required to apply the C change; this script only advances
+-- the extension version so the 0.4.0 / 0.4.1 -> 0.5.0 upgrade path is unbroken.
