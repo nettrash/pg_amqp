@@ -4,7 +4,12 @@ pg_amqp
 The pg_amqp package provides the ability for postgres statements to directly
 publish messages to an [AMQP](http://www.amqp.org/) broker.
 
-All bug reports, feature requests and general questions can be directed to the Issues section on Github. - http://github.com/omniti-labs/pg_amqp
+This repository is a maintained continuation of the original
+[OmniTI pg_amqp](https://github.com/omniti-labs/pg_amqp), carried forward by
+[nettrash](https://github.com/nettrash). All bug reports, feature requests and
+general questions can be directed to the [Issues
+section](https://github.com/nettrash/pg_amqp/issues) of this repository. See
+[Credits](#credits) below for the original authors and the history of changes.
 
 Compatibility
 -------------
@@ -233,3 +238,40 @@ exponential backoff (2s base, 30s cap) with per-backend jitter to avoid a
 cluster-wide reconnect storm. Prefer IP addresses over hostnames in
 `amqp.broker` — DNS resolution during connect is not covered by
 `connect_timeout_ms`.
+
+Credits
+-------
+
+pg_amqp was originally written by [Theo Schlossnagle](http://lethargy.org/~jesus/)
+at OmniTI Computer Consulting, Inc. (2009) and subsequently maintained by
+David E. Wheeler and [Keith Fiske](http://www.keithf4.com), with contributions
+from Vasilis Ventirozos, Eric Satterwhite, Mark Fowler, Patrick Molgaard, Phil
+Sorber, Robert Treat and others. The original project lives at
+[omniti-labs/pg_amqp](https://github.com/omniti-labs/pg_amqp).
+
+Since 0.4.3 this repository is maintained by
+[nettrash](https://github.com/nettrash), who added:
+
+- PostgreSQL 16 and 18 compatibility (ANSI C prototypes, PG 18 `XactEvent`
+  handling).
+- Per-broker TLS/SSL connections and IPv6 support (`getaddrinfo`).
+- Connection-handling optimizations: reconnect backoff, TCP keepalive/`NODELAY`,
+  split connect/operation timeouts, and cached broker configuration.
+- The optional `mandatory` argument with unroutable-return (`basic.return`)
+  reporting.
+- The **0.5.0** migration from the bundled ~2010 librabbitmq fork to the
+  maintained [rabbitmq-c](https://github.com/alanxz/rabbitmq-c) client, plus a
+  high-load / unreliable-broker hardening pass (bounded commit-path I/O,
+  GUC-tunable timeouts, loud message-loss `WARNING`s, savepoint/2PC safety,
+  broker flow-control awareness) and a transactional outbox for at-least-once
+  delivery.
+
+See the [CHANGELOG](CHANGELOG) for the full, per-release history.
+
+License
+-------
+
+pg_amqp is distributed under the BSD license; see the copyright header at the
+top of [`src/pg_amqp.c`](src/pg_amqp.c). Copyright (c) 2009 OmniTI Computer
+Consulting, Inc. All rights reserved. Contributions from subsequent maintainers
+are provided under the same terms.

@@ -4,7 +4,7 @@
     "version": "0.5.0",
    "description": "The pg_amqp package provides the ability for postgres statements to directly publish messages to an AMQP broker.",
    "maintainer":
-       [ "Theo Schlossnagle <jesus@omnti.com>", "Keith Fiske <keith@keithf4.com" ],
+       [ "Theo Schlossnagle <jesus@omniti.com>", "Keith Fiske <keith@keithf4.com>", "nettrash <nettrash@nettrash.me>" ],
    "license": [ "bsd", "mozilla_1_0" ],
    "generated_by": "Keith Fiske",
    "status": "stable",
@@ -25,11 +25,11 @@
    },
    "resources": {
        "bugtracker": {
-           "web": "https://github.com/omniti-labs/pg_amqp/issues"
+           "web": "https://github.com/nettrash/pg_amqp/issues"
        },
        "repository": {
-           "url": "git://github.com/omniti-labs/pg_amqp.git",
-           "web": "https://github.com/omniti-labs/pg_amqp",
+           "url": "https://github.com/nettrash/pg_amqp.git",
+           "web": "https://github.com/nettrash/pg_amqp",
            "type": "git"
        }
    },    

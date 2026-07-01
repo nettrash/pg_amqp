@@ -32,12 +32,14 @@ Support
 -------
 
 This library is stored in an open [GitHub
-repository](http://github.com/omniti-labs/pg_amqp). Feel free to fork and
-contribute! Please file bug reports via [GitHub
-Issues](http://github.com/omniti-labs/pg_amqp/issues/).
+repository](https://github.com/nettrash/pg_amqp), a maintained continuation of
+the original [OmniTI project](https://github.com/omniti-labs/pg_amqp). Feel free
+to fork and contribute! Please file bug reports via [GitHub
+Issues](https://github.com/nettrash/pg_amqp/issues/).
 
 Authors
 ------
 
-[Theo Schlossnagle](http://lethargy.org/~jesus/)
+[Theo Schlossnagle](http://lethargy.org/~jesus/) (original author)
 [Keith Fiske](http://www.keithf4.com)
+[nettrash](https://github.com/nettrash) (current maintainer)
