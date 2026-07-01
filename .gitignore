@@ -4,3 +4,6 @@ ignore/*
 .deps/*
 *.o
 *.so
+
+CLAUDE.md
+.claude/
