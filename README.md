@@ -272,6 +272,10 @@ License
 -------
 
 pg_amqp is distributed under the BSD license; see the copyright header at the
-top of [`src/pg_amqp.c`](src/pg_amqp.c). Copyright (c) 2009 OmniTI Computer
-Consulting, Inc. All rights reserved. Contributions from subsequent maintainers
-are provided under the same terms.
+top of [`src/pg_amqp.c`](src/pg_amqp.c).
+
+- Copyright (c) 2009 OmniTI Computer Consulting, Inc. All rights reserved.
+- Copyright (c) 2026 [nettrash](https://github.com/nettrash).
+
+Contributions from subsequent maintainers, including nettrash, are provided
+under the same BSD terms.
