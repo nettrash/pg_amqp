@@ -9,13 +9,13 @@
 CREATE TEMP TABLE amqp_preserve_privs_temp (statement text);
 
 INSERT INTO amqp_preserve_privs_temp
-SELECT 'GRANT EXECUTE ON FUNCTION @extschema@.autonomous_publish(integer, varchar, varchar, varchar, integer, varchar, varchar, varchar) TO '||array_to_string(array_agg(grantee::text), ',')||';'
+SELECT 'GRANT EXECUTE ON FUNCTION @extschema@.autonomous_publish(integer, varchar, varchar, varchar, integer, varchar, varchar, varchar, boolean) TO '||array_to_string(array_agg(grantee::text), ',')||';'
 FROM information_schema.routine_privileges
 WHERE routine_schema = '@extschema@'
 AND routine_name = 'autonomous_publish';
 
 INSERT INTO amqp_preserve_privs_temp
-SELECT 'GRANT EXECUTE ON FUNCTION @extschema@.publish(integer, varchar, varchar, varchar, integer, varchar, varchar, varchar) TO '||array_to_string(array_agg(grantee::text), ',')||';'
+SELECT 'GRANT EXECUTE ON FUNCTION @extschema@.publish(integer, varchar, varchar, varchar, integer, varchar, varchar, varchar, boolean) TO '||array_to_string(array_agg(grantee::text), ',')||';'
 FROM information_schema.routine_privileges
 WHERE routine_schema = '@extschema@'
 AND routine_name = 'publish';
