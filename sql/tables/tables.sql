@@ -13,6 +13,12 @@ CREATE TABLE @extschema@.broker (
   PRIMARY KEY (broker_id, host, port)
 );
 
+COMMENT ON COLUMN @extschema@.broker.ssl        IS 'Enable TLS/SSL for this broker connection';
+COMMENT ON COLUMN @extschema@.broker.ssl_verify IS 'Verify the broker TLS certificate (recommended: true)';
+COMMENT ON COLUMN @extschema@.broker.ssl_cacert IS 'Path to PEM CA certificate bundle (NULL = system defaults)';
+COMMENT ON COLUMN @extschema@.broker.ssl_cert   IS 'Path to PEM client certificate for mutual TLS (optional)';
+COMMENT ON COLUMN @extschema@.broker.ssl_key    IS 'Path to PEM client private key for mutual TLS (optional)';
+
 SELECT pg_catalog.pg_extension_config_dump('@extschema@.broker', '');
 SELECT pg_catalog.pg_extension_config_dump('@extschema@.broker_broker_id_seq', '');
 
