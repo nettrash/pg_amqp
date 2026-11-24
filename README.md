@@ -113,16 +113,27 @@ as connecting to a database as a super user and running
 
     CREATE EXTENSION amqp;
 
-If you've upgraded your cluster to PostgreSQL 9.1 and already had amqp
-installed, you can upgrade it to a properly packaged extension with:
+Upgrading
+---------
 
-    CREATE EXTENSION amqp FROM unpackaged;
-
-This is required to update to any versions >= 0.4.0.
-
-To update to the latest version, run the following command after running "make install" again:
+To update an existing installation, `make install` the new version, restart
+PostgreSQL (`pg_amqp.so` is preloaded, so running backends keep the old library
+until then), and run this in every database that has the extension:
 
     ALTER EXTENSION amqp UPDATE;
+
+Every released version from 0.3.0 onward updates directly to the current one.
+On PostgreSQL 18 and newer you can confirm that the loaded library and the
+installed SQL match:
+
+    SELECT version FROM pg_get_loaded_modules() WHERE module_name = 'pg_amqp';
+    SELECT extversion FROM pg_extension WHERE extname = 'amqp';
+
+Installations that were never packaged as an extension (pg_amqp older than 0.3.0,
+loaded from a plain SQL script) cannot be updated in place.
+`CREATE EXTENSION ... FROM unpackaged` was removed in PostgreSQL 13, and this
+release does not ship an `unpackaged` script. Save the rows of `amqp.broker`,
+drop the old `amqp` schema, run `CREATE EXTENSION amqp`, and re-insert the rows.
 
 Basic Usage
 -----------
