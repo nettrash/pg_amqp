@@ -14,6 +14,13 @@ section](https://github.com/nettrash/pg_amqp/issues) of this repository. See
 Compatibility
 -------------
 
+Version 0.5.1 supports PostgreSQL 19. It builds warning-free against PostgreSQL
+14 through 19 and has been tested end to end on PostgreSQL 16, 18 and 19 against
+RabbitMQ 4.4. On PostgreSQL 18 and newer, `pg_get_loaded_modules()` reports the
+loaded `pg_amqp` library version. If it differs from `extversion` in
+`pg_extension`, run `ALTER EXTENSION amqp UPDATE` (or `make install` the matching
+build).
+
 Version 0.5.0 migrates the transport from the bundled librabbitmq fork to the
 maintained [rabbitmq-c](https://github.com/alanxz/rabbitmq-c) library (0.9 or
 newer; Ubuntu 20.04+/Debian 11+ `librabbitmq-dev` is supported, and the build is
@@ -252,8 +259,8 @@ Sorber, Robert Treat and others. The original project lives at
 Since 0.4.3 this repository is maintained by
 [nettrash](https://github.com/nettrash), who added:
 
-- PostgreSQL 16 and 18 compatibility (ANSI C prototypes, PG 18 `XactEvent`
-  handling).
+- PostgreSQL 16, 18 and 19 compatibility (ANSI C prototypes, PG 18 `XactEvent`
+  handling, PG 18+ module version reporting).
 - Per-broker TLS/SSL connections and IPv6 support (`getaddrinfo`).
 - Connection-handling optimizations: reconnect backoff, TCP keepalive/`NODELAY`,
   split connect/operation timeouts, and cached broker configuration.
