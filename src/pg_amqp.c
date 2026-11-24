@@ -85,7 +85,13 @@
   } \
 } while(0)
 
-#ifdef PG_MODULE_MAGIC
+#ifdef PG_MODULE_MAGIC_EXT
+/* PostgreSQL 18+: also report name/version in pg_get_loaded_modules(), so a
+ * pg_amqp.so that is out of step with the installed extension SQL (make install
+ * without ALTER EXTENSION amqp UPDATE, or vice versa) is easy to spot.
+ * PG_AMQP_VERSION is passed in by the Makefile from amqp.control. */
+PG_MODULE_MAGIC_EXT(.name = "pg_amqp", .version = PG_AMQP_VERSION);
+#elif defined(PG_MODULE_MAGIC)
 PG_MODULE_MAGIC;
 #endif
 void _PG_init(void);

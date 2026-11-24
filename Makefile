@@ -25,6 +25,9 @@ RABBITMQ_LIBS   := $(shell $(PKG_CONFIG) --libs librabbitmq 2>/dev/null || echo 
 PG_CPPFLAGS += $(RABBITMQ_CFLAGS)
 SHLIB_LINK  += $(RABBITMQ_LIBS)
 
+# Single source of truth for the version reported by PG_MODULE_MAGIC_EXT (PG 18+).
+PG_CPPFLAGS += -DPG_AMQP_VERSION='"$(EXTVERSION)"'
+
 
 all: sql/$(EXTENSION)--$(EXTVERSION).sql
 

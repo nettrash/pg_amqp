@@ -1,0 +1,3 @@
+-- No schema changes in 0.5.1.
+-- This release adds PostgreSQL 19 support and, on PostgreSQL 18+, reports the
+-- module name/version in pg_get_loaded_modules() (C code only).
